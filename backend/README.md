@@ -9,6 +9,7 @@ This backend is a development scaffold for local testing.
 - `/auth/login`
 - `/auth/me`
 - `/api/conversations`
+- `/api/conversations/{conversation_id}`
 - `/api/conversations/{conversation_id}/messages`
 - `/api/realtime/client-secret`
 
@@ -23,11 +24,19 @@ cp .env.example .env
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Set `MEDIVOX_DEV_TOKEN` in `.env` before testing the client-secret endpoint.
+Set at least these values in `.env`:
+
+- `MEDIVOX_TOKEN_SECRET`
+- `OPENAI_API_KEY`
+- `OPENAI_REALTIME_MODEL`
+
+`MEDIVOX_DEV_TOKEN` is optional for legacy test clients.
 
 ## Notes
 
 This is a development scaffold, not a production backend.
-- Passwords are stored only in memory for local testing.
-- Tokens are stored only in memory for local testing.
-- Replace the in-memory stores with a proper database and secure authentication before release.
+- Passwords are hashed with PBKDF2 before being stored in the local state file.
+- Access tokens are signed and time-limited.
+- Auth and conversation state persist locally in `backend/.medivox_state.json`.
+- Replace the local file store with a proper database and production identity provider before release.
+- Keep the OpenAI API key server-side only.

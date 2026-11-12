@@ -1,8 +1,22 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val localProperties = Properties().apply {
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) {
+        localFile.inputStream().use(::load)
+    }
+}
+
+fun String.asBuildConfigString(): String =
+    "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val backendUrl = localProperties.getProperty("medivoxBackendUrl", "http://10.0.2.2:8000")
 
 android {
     namespace = "com.medivox.ai"
@@ -12,8 +26,10 @@ android {
         applicationId = "com.medivox.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+
+        buildConfigField("String", "MEDIVOX_BACKEND_URL", backendUrl.asBuildConfigString())
     }
 
     buildFeatures {
@@ -69,5 +85,8 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.webrtc:google-webrtc:1.0.32006")
+
     testImplementation("junit:junit:4.13.2")
 }

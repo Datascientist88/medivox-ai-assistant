@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
+import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,8 +25,8 @@ from .storage import store
 
 app = FastAPI(title="MediVox API", version="0.3.0")
 
-OPENAI_API_KEY = ""
-OPENAI_REALTIME_MODEL = "gpt-realtime-2.1"
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_REALTIME_MODEL = os.getenv("OPENAI_REALTIME_MODEL", "gpt-realtime-2.1")
 
 
 class AuthRequest(BaseModel):

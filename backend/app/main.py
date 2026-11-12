@@ -4,6 +4,10 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
@@ -160,9 +164,7 @@ async def create_client_secret(user_id: str = Depends(get_user_id)) -> dict[str,
                 "Content-Type": "application/json",
                 "OpenAI-Safety-Identifier": hashed_user,
             },
-            json={
-                "session": session_config,
-            },
+            json={"session": session_config},
         )
 
     if response.is_error:

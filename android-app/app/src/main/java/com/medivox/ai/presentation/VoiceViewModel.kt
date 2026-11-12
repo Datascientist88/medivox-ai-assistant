@@ -1,22 +1,39 @@
 package com.medivox.ai.presentation
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.medivox.ai.data.ConversationSummary
+import com.medivox.ai.data.ConversationRepository
+import com.medivox.ai.data.RealtimeTokenProvider
+import com.medivox.ai.data.SecureSessionStore
 import com.medivox.ai.voice.TranscriptEntry
 import com.medivox.ai.voice.VoicePhase
 import com.medivox.ai.voice.VoiceUiState
-import kotlinx.coroutines.delay
+import com.medivox.ai.voice.WebRtcRealtimeClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
 
-class VoiceViewModel : ViewModel() {
+class VoiceViewModel(application: Application) : AndroidViewModel(application),
+    WebRtcRealtimeClient.Listener {
+
+    private val conversations = ConversationRepository(application)
+    private val tokenStore = SecureSessionStore(application)
+    private val client = WebRtcRealtimeClient(
+        context = application,
+        tokenProvider = RealtimeTokenProvider(application),
+        listener = this,
+    )
+
     private val stateFlow = MutableStateFlow(VoiceUiState())
     val state: StateFlow<VoiceUiState> = stateFlow.asStateFlow()
+    private var activeConversationId: String? = null
+
+    init {
+        refreshHistory()
+    }
 
     fun connect() {
         if (stateFlow.value.isBusy || stateFlow.value.isSessionActive) return
@@ -26,38 +43,50 @@ class VoiceViewModel : ViewModel() {
                     phase = VoicePhase.CONNECTING,
                     errorMessage = null,
                     transcript = emptyList(),
-                    liveCaption = ""
+                    liveCaption = "",
                 )
             }
-            delay(500)
-            stateFlow.update {
-                it.copy(
-                    phase = VoicePhase.LISTENING,
-                    transcript = listOf(
-                        TranscriptEntry("MediVox", "Demo mode is ready. Replace this with WebRTC voice transport next."),
-                    ),
-                    recentConversations = listOf(
-                        ConversationSummary(UUID.randomUUID().toString(), "Voice session demo", "just now")
+            runCatching {
+                activeConversationId = conversations.create("Voice conversation")
+                client.connect()
+            }.onFailure { error ->
+                stateFlow.update {
+                    it.copy(
+                        phase = VoicePhase.ERROR,
+                        errorMessage = error.message ?: "Could not start the voice conversation.",
                     )
-                )
+                }
+                refreshHistory()
             }
         }
     }
 
     fun disconnect() {
-        if (stateFlow.value.phase == VoicePhase.IDLE || stateFlow.value.phase == VoicePhase.DISCONNECTING) return
+        if (stateFlow.value.phase == VoicePhase.IDLE ||
+            stateFlow.value.phase == VoicePhase.DISCONNECTING
+        ) return
+
         viewModelScope.launch {
             stateFlow.update { it.copy(phase = VoicePhase.DISCONNECTING) }
-            delay(250)
+            client.close()
+            activeConversationId = null
             stateFlow.update { it.copy(phase = VoicePhase.IDLE, liveCaption = "") }
+            refreshHistory()
         }
+    }
+
+    fun signOut() {
+        client.close()
+        activeConversationId = null
+        tokenStore.clear()
+        stateFlow.value = VoiceUiState()
     }
 
     fun reportPermissionDenied() {
         stateFlow.update {
             it.copy(
                 phase = VoicePhase.ERROR,
-                errorMessage = "Microphone permission is required for voice sessions."
+                errorMessage = "Microphone permission is required for a voice conversation.",
             )
         }
     }
@@ -72,21 +101,75 @@ class VoiceViewModel : ViewModel() {
         stateFlow.update {
             it.copy(
                 transcript = it.transcript + TranscriptEntry("You", trimmed),
-                liveCaption = ""
+                liveCaption = "",
             )
         }
         viewModelScope.launch {
             stateFlow.update { it.copy(phase = VoicePhase.THINKING) }
-            delay(450)
+            runCatching {
+                val conversationId = activeConversationId ?: conversations.create("Voice conversation")
+                activeConversationId = conversationId
+                conversations.addMessage(conversationId, "user", trimmed)
+                conversations.addMessage(
+                    conversationId,
+                    "assistant",
+                    "Thanks. In the full build, this conversation will flow through OpenAI Realtime over WebRTC."
+                )
+            }
             stateFlow.update {
                 it.copy(
                     phase = VoicePhase.LISTENING,
                     transcript = it.transcript + TranscriptEntry(
                         "MediVox",
                         "Thanks. In the full build, this conversation will flow through OpenAI Realtime over WebRTC."
-                    )
+                    ),
                 )
             }
         }
+    }
+
+    private fun refreshHistory() {
+        viewModelScope.launch {
+            runCatching { conversations.recent() }
+                .onSuccess { items -> stateFlow.update { current -> current.copy(recentConversations = items) } }
+        }
+    }
+
+    override fun onPhaseChanged(phase: VoicePhase) {
+        stateFlow.update { current ->
+            if (current.phase == VoicePhase.DISCONNECTING) current
+            else current.copy(phase = phase, errorMessage = null)
+        }
+    }
+
+    override fun onTranscript(speaker: String, text: String, isFinal: Boolean) {
+        if (text.isBlank()) return
+        stateFlow.update { current ->
+            if (isFinal) {
+                current.copy(
+                    transcript = current.transcript + TranscriptEntry(speaker, text),
+                    liveCaption = "",
+                )
+            } else {
+                current.copy(liveCaption = current.liveCaption + text)
+            }
+        }
+        if (isFinal) {
+            val id = activeConversationId ?: return
+            viewModelScope.launch {
+                runCatching {
+                    conversations.addMessage(id, if (speaker == "MediVox") "assistant" else "user", text)
+                }
+            }
+        }
+    }
+
+    override fun onError(message: String) {
+        stateFlow.update { it.copy(errorMessage = message) }
+    }
+
+    override fun onCleared() {
+        client.close()
+        super.onCleared()
     }
 }

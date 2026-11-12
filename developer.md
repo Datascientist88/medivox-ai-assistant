@@ -37,17 +37,19 @@ MediVox is an Android-first conversational AI health information assistant. Its 
 | Android root build file | Present |
 | Android app build file | Present |
 | Android manifest/resources/theme | Present |
-| Android demo auth/voice UI | Present |
-| Demo voice state/view models | Present |
+| Android app auth/voice UI | Present |
+| Android voice client | Present in source |
+| Android backend API/session storage layer | Present in source |
 | Backend scaffold | Present |
-| Real WebRTC voice transport | Not yet implemented |
+| Realtime client-secret flow | Present in source |
 | Production authentication | Not yet implemented |
-| Persistent conversation storage | Not yet implemented |
+| Persistent conversation storage | Present for development/local testing |
+| Real WebRTC voice transport | Present in source; not yet build-verified in this session |
 | RAG pipeline | Not implemented; intentionally deferred |
 
 ### Current milestone
 
-Status: buildable Android foundation and local development scaffolding are in place; real WebRTC and production backend work are next.
+Status: the Android and backend foundations are in place in source; the next priority is build verification, then tightening the production auth and voice transport path.
 
 ---
 
@@ -169,7 +171,7 @@ Acceptance:
 
 ### Phase 2 — OpenAI Realtime WebRTC voice engine
 
-Status: Not started
+Status: In progress
 
 Deliverables:
 - Backend-issued short-lived Realtime client secret.
@@ -186,7 +188,7 @@ Acceptance:
 
 ### Phase 3 — Accounts, profiles, and conversation history
 
-Status: Not started
+Status: In progress for local development
 
 Deliverables:
 - Registration and login.
@@ -228,10 +230,10 @@ Deliverables:
 
 Prioritized next tasks:
 
-1. Replace the demo voice session with real WebRTC transport.
-2. Make the backend issue short-lived OpenAI Realtime client secrets.
-3. Replace in-memory demo auth with real user authentication.
-4. Persist conversations per user.
+1. Run a clean Android build and resolve any compile-time issues.
+2. Verify the backend auth and local persistence flow end-to-end.
+3. Harden the OpenAI Realtime client-secret flow for production authentication.
+4. Tighten the voice session cleanup/reconnect behavior.
 5. Add build/test automation.
 
 Do not start RAG implementation before the voice MVP and safety/privacy foundations are stable.
@@ -278,3 +280,13 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - Tests run: not yet executed in this session.
 - Known issues: real WebRTC transport, persistent auth, and persistent conversation storage are still pending.
 - Next: wire real WebRTC voice transport and replace the demo auth/session flow.
+
+### 2026-11-12 — Realtime voice and backend auth wiring
+- Added backend signed-token security helpers, local persistent storage, and authenticated Realtime client-secret issuance.
+- Added Android backend API, secure session storage, auth repository, conversation repository, and WebRTC realtime client.
+- Updated the Android voice view model to use the backend-backed flow.
+- Removed duplicate Android data models.
+- Added the backend state file to `.gitignore`.
+- Tests run: not yet executed in this session.
+- Known issues: no clean build/test verification yet; production auth and release hardening are still pending.
+- Next: run a clean compile and fix any remaining build errors, then exercise the backend and realtime flows locally.

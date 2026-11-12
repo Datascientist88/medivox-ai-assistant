@@ -141,17 +141,11 @@ class SecureSessionStore(context: Context) {
     }
 }
 
-data class AuthUser(
-    val id: String,
-    val email: String,
-    val displayName: String,
-)
-
 class AuthRepository(context: Context) {
     private val api = BackendApi(context)
     private val tokenStore = SecureSessionStore(context)
 
-    suspend fun register(email: String, password: String, displayName: String): AuthUser {
+    suspend fun register(email: String, password: String, displayName: String): AppUser {
         val response = api.post(
             "/auth/register",
             JSONObject()
@@ -164,7 +158,7 @@ class AuthRepository(context: Context) {
         return userFrom(response.getJSONObject("user"))
     }
 
-    suspend fun login(email: String, password: String): AuthUser {
+    suspend fun login(email: String, password: String): AppUser {
         val response = api.post(
             "/auth/login",
             JSONObject().put("email", email.trim()).put("password", password),
@@ -174,25 +168,19 @@ class AuthRepository(context: Context) {
         return userFrom(response.getJSONObject("user"))
     }
 
-    suspend fun currentUser(): AuthUser {
+    suspend fun currentUser(): AppUser {
         val response = api.get("/auth/me")
         return userFrom(response.getJSONObject("user"))
     }
 
     fun logout() = tokenStore.clear()
 
-    private fun userFrom(json: JSONObject) = AuthUser(
+    private fun userFrom(json: JSONObject) = AppUser(
         id = json.getString("id"),
         email = json.getString("email"),
         displayName = json.optString("display_name", ""),
     )
 }
-
-data class ConversationSummary(
-    val id: String,
-    val title: String,
-    val updatedAt: String,
-)
 
 class ConversationRepository(context: Context) {
     private val api = BackendApi(context)

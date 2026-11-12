@@ -16,3 +16,4 @@ captures/
 .venv/
 __pycache__/
 *.py[cod]
+backend/.medivox_state.json
